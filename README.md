@@ -14,4 +14,9 @@ Encrypt your text messages into fun and visually appealing emojis with `emoji-en
 ```bash
 git clone https://github.com/your-username/emoji-encrypt.py.git
 ```
+2. Enter directory:
+3. ```bash cd emoji-encrypt.py```
+4. Run Script
+   ```bash python3 emoji-encrypt.py```
+Enjoy!
 [https://t.me/ROCKMURPHY]

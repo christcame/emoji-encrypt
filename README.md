@@ -16,11 +16,11 @@ git clone https://github.com/your-username/emoji-encrypt.py.git
 ```
 2. Enter directory:
 ```
-bash cd emoji-encrypt.py
+cd emoji-encrypt.py
 ```
 4. Run Script
 ```
-bash python3 emoji-encrypt.py
+python3 emoji-encrypt.py
 ```
 Enjoy!
 [https://t.me/ROCKMURPHY]

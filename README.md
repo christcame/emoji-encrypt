@@ -12,11 +12,11 @@ Encrypt your text messages into fun and visually appealing emojis with `emoji-en
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/emoji-encrypt.py.git
+git clone https://github.com/your-username/emoji-encrypt.git
 ```
 2. Enter directory:
 ```
-cd emoji-encrypt.py
+cd emoji-encrypt
 ```
 4. Run Script
 ```

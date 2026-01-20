@@ -1,118 +1,95 @@
 import hashlib
 import random
-import string
+import re
+import unicodedata
 from typing import List, Dict
 
 class SecureEmojiCipher:
-   # Stream Crypter!
+    # Stream Cypher!
 
     def __init__(self, password: str):
-        # Password!
         if not password:
             raise ValueError("Password cannot be empty.")
 
-        # Generate a numeric seed from the password using SHA-256
+        # Generate Seed from Password
         self.password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
         self.seed_int = int(self.password_hash, 16)
         
-        # Create the Emoji Map (0-255)
-        all_emojis = self._get_emoji_database()
-        if len(all_emojis) < 256:
-            raise RuntimeError("Emoji database is too small. Need at least 256 unique emojis.")
+        # Dynamically generate a clean list of emojis
+        clean_emojis = self._generate_atomic_emojis()
         
-        # Create a deterministic RNG based on the password
+        if len(clean_emojis) < 256:
+            raise RuntimeError(f"System error: Generated only {len(clean_emojis)} emojis. Need 256.")
+        
+        # Create the Mapping (0-255)
         rng = random.Random(self.seed_int)
-        
-        # Shuffle the emojis to create a random substitution table for the bytes 0-255
-        self.emoji_table = rng.sample(all_emojis, 256)
-        
-        # Create reverse lookup: Emoji -> Byte Index (for decryption)
+        self.emoji_table = rng.sample(clean_emojis, 256)
         self.reverse_emoji_table = {emoji: i for i, emoji in enumerate(self.emoji_table)}
 
+    def _generate_atomic_emojis(self) -> List[str]:
+        # Generates a list of emojis by iterating through Unicode ranges.
+        emojis = []
+        
+        # Emoticons (Classic faces) - U+1F600 to U+1F64F
+        for code in range(0x1F600, 0x1F650):
+            emojis.append(chr(code))
+            
+        # Transport & Map Symbols - U+1F680 to U+1F6FF
+        for code in range(0x1F680, 0x1F700):
+            emojis.append(chr(code))
+            
+        # Misc Symbols and Pictographs - U+1F300 to U+1F5FF (Subset)
+        # We skip some ranges that might contain multi-char combos
+        for code in range(0x1F300, 0x1F400): 
+            emojis.append(chr(code))
+
+        # Geometric Shapes Extended - U+1F780 to U+1F7FF
+        for code in range(0x1F780, 0x1F7F0):
+            emojis.append(chr(code))
+            
+        # Supplemental Symbols and Pictographs - U+1F900 to U+1F9FF
+        for code in range(0x1F900, 0x1F9B0):
+            emojis.append(chr(code))
+
+        return emojis
+
     def _get_keystream_byte(self, index: int) -> int:
-        # Generates a cryptographic pseudo-random byte for a specific index.
-       
-        # Combine the master hash with the current index to get a unique hash
         data_to_hash = f"{self.password_hash}{index}".encode('utf-8')
-        # Return the first byte of the SHA256 hash
         return hashlib.sha256(data_to_hash).digest()[0]
 
     def encrypt(self, plaintext: str) -> str:
-        # Encrypts text by XORing bytes with a keystream and mapping to emojis.
-        # Convert text to raw bytes (handles UTF-8, special chars, etc.)
         plain_bytes = plaintext.encode('utf-8')
         encrypted_chars = []
-
         for i, byte_val in enumerate(plain_bytes):
-            # Get keystream byte
             key_byte = self._get_keystream_byte(i)
-            
-            # XOR (The encryption operation)
             encrypted_byte = byte_val ^ key_byte
-            
-            # Map resulting byte (0-255) to an emoji
             encrypted_chars.append(self.emoji_table[encrypted_byte])
-            
         return ''.join(encrypted_chars)
 
     def decrypt(self, ciphertext: str) -> str:
-        # It is safer to iterate strictly over the string indices to handle 
+        # Normalize input to remove variation selectors
+        cleaned_text = unicodedata.normalize('NFC', ciphertext)
+        cleaned_text = re.sub(r'[\ufe0e\ufe0f]', '', cleaned_text)
+        
         decrypted_bytes = []
-        
-        # We need to iterate through the string finding our specific emojis.
-        current_index = 0
-        
-        # Create a fast lookup map for scanning if needed, 
-        # but since we have a direct map in reverse_emoji_table:
-        
-        # NOTE: Standard iteration over a string in Python splits by Unicode code point.
-        
-        for i, char in enumerate(ciphertext):
+        for i, char in enumerate(cleaned_text):
             if char in self.reverse_emoji_table:
-                # Map emoji back to encrypted byte value
                 encrypted_byte = self.reverse_emoji_table[char]
-                
-                # Recreate keystream byte
                 key_byte = self._get_keystream_byte(i)
-                
-                # XOR to retrieve original byte
-                decrypted_byte = encrypted_byte ^ key_byte
-                decrypted_bytes.append(decrypted_byte)
+                decrypted_bytes.append(encrypted_byte ^ key_byte)
             else:
-                # If we encounter an emoji not in our map (e.g. from a different version),
-                # we can't decrypt it properly. We raise an error or skip.
-                # Here we raise to ensure integrity.
-                raise ValueError(f"Invalid emoji found at position {i}: {char}. Cannot decrypt.")
-
-        # Convert bytes back to string
+                # If this happens, the text was encrypted with a different database version
+                raise ValueError(
+                    f"Character mismatch at position {i}: '{char}'. "
+                    "This text was likely encrypted with a different version of the tool. "
+                    "Please re-encrypt your text with this version."
+                )
         return bytes(decrypted_bytes).decode('utf-8')
 
-    @staticmethod
-    def _get_emoji_database() -> List[str]:
-        # A curated list of diverse emojis to ensure we hit 256+
-        raw_list = [
-            '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙',
-            '😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥',
-            '😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓',
-            '🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣',
-            '😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾',
-            '🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊','💋','💌','💘','💝','💖','💗','💓',
-            '💞','💕','💟','❣️','💔','❤️','🧡','💛','💚','💙','💜','🤎','🖤','🤍','💯','💢','💥','💫','💦','💨',
-            '🕳️','💣','💬','👁️‍🗨️','🗨️','🗯️','💭','💤','👋','🤚','🖐️','✋','🖖','👌','🤏','✌️','🤞','🤟','🤘','🤙',
-            '👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅',
-            '🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄','👶','🧒',
-            '👦','👧','🧑','👱','👨','🧔','👩','🧓','👴','👵','🙍','🙎','🙅','🙆','💁','🙋','🧏','🙇','🤦','🤷',
-            '👨‍⚕️','👩‍⚕️','👨‍🎓','👩‍🎓','👨‍🏫','👩‍🏫','👨‍⚖️','👩‍⚖️','👨‍🌾','👩‍🌾','👨‍🍳','👩‍🍳','👨‍🔧','👩‍🔧','👨‍🏭','👩‍🏭',
-            '👨‍💼','👩‍💼','👨‍🔬','👩‍🔬','👨‍💻','👩‍💻','👨‍🎤','👩‍🎤','👨‍🎨','👩‍🎨','👨‍✈️','👩‍✈️','👨‍🚀','👩‍🚀','👨‍🚒','👩‍🚒',
-            '👮','🕵️','💂','👷','🤴','👸','👳','👲','🧕','🤵','👰','🤰','🤱','👼','🎅','🤶','🦸','🦹','🧙','🧚',
-            '🧛','🧜','🧝','🧞','🧟','💆','💇','🚶','🧍','🧎','🧑‍🦯','🧑‍🦼','🧑‍🦽','🏃','💃','🕺','🕴️','👯','🧖','🧘',
-            '🧗','🤺','🏇','⛷️','🏂','🏌️','🏄','🚣','🏊','⛹️','🏋️','🚴','🚵','🤸','🤼','🤽','🤾','🤹','🛀','🛌'
-        ]
-        # Deduplicate just in case
-        return list(set(raw_list))
-
 def main():
-    print("--- Secure Emoji Encryption (Stream Cipher) ---")
+    print("--- Stable Secure Emoji Encryption ---")
+    print("NOTE: This version uses a dynamically generated emoji list.")
+    print("Text encrypted with older versions cannot be decrypted here.\n")
     
     try:
         password = input("Enter password: ")
@@ -136,7 +113,6 @@ def main():
                 print(f"\nDecrypted Text:\n{result}")
             except ValueError as e:
                 print(f"\nDecryption Failed: {e}")
-                print("Ensure you are using the exact same password and that no emojis were modified.")
                 
         else:
             print("Invalid action.")
